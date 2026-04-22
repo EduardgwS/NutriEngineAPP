@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ksp)
 }
 
 android {
@@ -15,8 +16,8 @@ android {
         applicationId = "com.explosionlab.nutriengine"
         minSdk = 27
         targetSdk = 36
-        versionCode = 6
-        versionName = "0.6.0"
+        versionCode = 7
+        versionName = "0.7.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -49,26 +50,32 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
 
-
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.auth)
     implementation(libs.google.identity.googleid)
     implementation(libs.androidx.navigation.compose)
 
-
     implementation(libs.okhttp)
 
-
     implementation(libs.androidx.health.connect)
-
 
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
 
-
     implementation(libs.androidx.compose.material.icons)
     implementation(libs.androidx.material3)
+
+    // Carregamento de imagens remotas
+    implementation("io.coil-kt:coil-compose:2.7.0")
+
+    // Tarefas em background e notificações agendadas
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+
+    // Room
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

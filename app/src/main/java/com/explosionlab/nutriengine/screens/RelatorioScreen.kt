@@ -7,22 +7,30 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.BakeryDining
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.KebabDining
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.explosionlab.nutriengine.repository.ConsumoRepository
 import com.explosionlab.nutriengine.repository.Objetivo
@@ -50,25 +58,30 @@ fun RelatorioScreen(
     innerPadding: PaddingValues      = PaddingValues(),
     viewModel:    RelatorioViewModel = viewModel()
 ) {
-    val state     = viewModel.state
-    val pullState = rememberPullToRefreshState()
+    val state by viewModel.state.collectAsStateWithLifecycle()
 
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.carregarDados() }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.recarregarRelatorio()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
-    PullToRefreshBox(
-        isRefreshing = state.carregando,
-        onRefresh    = { viewModel.carregarDados() },
-        state        = pullState,
+    Box(
         modifier     = Modifier.fillMaxSize().padding(innerPadding),
     ) {
         if (state.carregando) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = NutriGreen)
             }
-            return@PullToRefreshBox
+            return@Box
         }
 
-        val p = state.perfil ?: return@PullToRefreshBox
+        val p = state.perfil ?: return@Box
 
         Column(
             modifier            = Modifier
@@ -130,7 +143,7 @@ fun RelatorioScreen(
                 Card(modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("Contas q eu peguei da net pra calcular as calorias:", style = MaterialTheme.typography.labelLarge,
+                        Text("Contas utilizadas no cálculo de calorias diárias:", style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         LinhaCalculo("TMB (Mifflin-St Jeor)", "%.0f kcal/dia".format(p.tmb), "Calorias em repouso absoluto")
                         LinhaCalculo("Fator de atividade", "× %.3f".format(p.nivelAtividade.fator), p.nivelAtividade.label)
@@ -172,9 +185,9 @@ fun RelatorioScreen(
                             Objetivo.MELHORAR_ALIMENTACAO -> Triple(0.50, 0.25, 0.25)
                         }
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            MacroCard("Carbo",    "%.0fg".format(kcal * pCarbo / 4), "%.0f%%".format(pCarbo * 100), Modifier.weight(1f))
-                            MacroCard("Proteína", "%.0fg".format(kcal * pProt  / 4), "%.0f%%".format(pProt  * 100), Modifier.weight(1f))
-                            MacroCard("Gordura",  "%.0fg".format(kcal * pGord  / 9), "%.0f%%".format(pGord  * 100), Modifier.weight(1f))
+                            MacroCard("Carbo",    "%.0fg".format(kcal * pCarbo / 4), "%.0f%%".format(pCarbo * 100), Modifier.weight(1f), icon = Icons.Default.BakeryDining)
+                            MacroCard("Proteína", "%.0fg".format(kcal * pProt  / 4), "%.0f%%".format(pProt  * 100), Modifier.weight(1f), icon = Icons.Default.KebabDining)
+                            MacroCard("Gordura",  "%.0fg".format(kcal * pGord  / 9), "%.0f%%".format(pGord  * 100), Modifier.weight(1f), icon = Icons.Default.WaterDrop)
                         }
                         Text("Proporções otimizadas para: ${p.objetivo.label.lowercase()}.",
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -204,8 +217,8 @@ fun RelatorioScreen(
             // ── Histórico de alimentos ─────────────────────────────────────────
             HistoricoAlimentosSection(
                 historico  = state.historicoCompleto7Dias,
-                onEditar   = { data, listaId, idx, g -> viewModel.editarAlimento(data, listaId, idx, g) },
-                onRemover  = { data, listaId, idx    -> viewModel.removerAlimento(data, listaId, idx) },
+                onEditar   = { data, listaId, alimentoId, g -> viewModel.editarAlimento(data, listaId, alimentoId, g) },
+                onRemover  = { data, listaId, alimentoId    -> viewModel.removerAlimento(data, listaId, alimentoId) },
                 onRemoverLista = { data, listaId     -> viewModel.removerLista(data, listaId) },
             )
 
@@ -214,11 +227,11 @@ fun RelatorioScreen(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                     Column(modifier = Modifier.padding(24.dp).fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("📊", fontSize = 40.sp)
-                        Spacer(Modifier.height(8.dp))
-                        Text("Complete seu perfil para ver seus dados aqui.",
+                        Text(
+                            "Complete seu perfil para ver seus dados aqui.",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
@@ -231,8 +244,8 @@ fun RelatorioScreen(
 @Composable
 private fun HistoricoAlimentosSection(
     historico:     List<ConsumoRepository.ConsumoCompleto>,
-    onEditar:      (data: String, listaId: String, alimentoIndex: Int, novaQuantidadeG: Double) -> Unit,
-    onRemover:     (data: String, listaId: String, alimentoIndex: Int) -> Unit,
+    onEditar:      (data: String, listaId: String, alimentoId: String, novaQuantidadeG: Double) -> Unit,
+    onRemover:     (data: String, listaId: String, alimentoId: String) -> Unit,
     onRemoverLista:(data: String, listaId: String) -> Unit,
 ) {
     val diasComListas = historico.filter { it.listas.isNotEmpty() }
@@ -308,8 +321,8 @@ private fun HistoricoAlimentosSection(
 private fun DiaCard(
     consumoCompleto: ConsumoRepository.ConsumoCompleto,
     modoEdicao:      Boolean,
-    onEditar:        (String, String, Int, Double) -> Unit,
-    onRemover:       (String, String, Int) -> Unit,
+    onEditar:        (String, String, String, Double) -> Unit,
+    onRemover:       (String, String, String) -> Unit,
     onRemoverLista:  (String, String) -> Unit,
 ) {
     var diaExpandido by remember(consumoCompleto.consumo.data) {
@@ -397,8 +410,8 @@ private fun ListaCard(
     data:           String,
     lista:          ConsumoRepository.ListaSalva,
     modoEdicao:     Boolean,
-    onEditar:       (String, String, Int, Double) -> Unit,
-    onRemover:      (String, String, Int) -> Unit,
+    onEditar:       (String, String, String, Double) -> Unit,
+    onRemover:      (String, String, String) -> Unit,
     onRemoverLista: (String, String) -> Unit,
 ) {
     var expandida   by remember(lista.id) { mutableStateOf(true) }
@@ -439,12 +452,23 @@ private fun ListaCard(
                 verticalAlignment     = Alignment.CenterVertically,
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        "🕐 $horaLabel",
-                        style      = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color      = NutriGreen,
-                    )
+                    Row(
+                        verticalAlignment     = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector        = Icons.Default.AccessTime,
+                            contentDescription = null,
+                            tint               = NutriGreen,
+                            modifier           = Modifier.size(14.dp)
+                        )
+                        Text(
+                            horaLabel,
+                            style      = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color      = NutriGreen,
+                        )
+                    }
                     Text(
                         "$nItens ${if (nItens == 1) "item" else "itens"} · %.0f kcal".format(lista.totalKcal),
                         style = MaterialTheme.typography.bodySmall,
@@ -478,12 +502,12 @@ private fun ListaCard(
                     HorizontalDivider()
                     Spacer(Modifier.height(4.dp))
 
-                    lista.alimentos.forEachIndexed { index, alimento ->
+                    lista.alimentos.forEach { alimento ->
                         AlimentoEditavelRow(
                             alimento       = alimento,
                             modoEdicao     = modoEdicao,
-                            onSalvarGramas = { g -> onEditar(data, lista.id, index, g) },
-                            onRemover      = { onRemover(data, lista.id, index) },
+                            onSalvarGramas = { g -> onEditar(data, lista.id, alimento.id, g) },
+                            onRemover      = { onRemover(data, lista.id, alimento.id) },
                         )
                     }
 
@@ -760,12 +784,29 @@ fun LinhaCalculo(
 }
 
 @Composable
-fun MacroCard(nome: String, gramas: String, porcento: String, modifier: Modifier = Modifier) {
+fun MacroCard(
+    nome:     String,
+    gramas:   String,
+    porcento: String,
+    modifier: Modifier     = Modifier,
+    icon:     ImageVector? = null
+) {
     Card(modifier = modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)) {
         Column(modifier = Modifier.padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(nome,     style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (icon != null) {
+                    Icon(
+                        imageVector        = icon,
+                        contentDescription = null,
+                        tint               = NutriGreen,
+                        modifier           = Modifier.size(14.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                }
+                Text(nome, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             Text(gramas,   style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.ExtraBold)
             Text(porcento, style = MaterialTheme.typography.labelSmall, color = NutriGreen, fontWeight = FontWeight.SemiBold)
         }

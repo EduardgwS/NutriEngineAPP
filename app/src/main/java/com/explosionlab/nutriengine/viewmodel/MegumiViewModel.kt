@@ -64,14 +64,21 @@ class MegumiViewModel(application: Application) : AndroidViewModel(application) 
         if (!isConectado()) { semConexao = true; return }
         semConexao = false
 
+        // 1. Adiciona mensagem do usuário
         _mensagens.value = _mensagens.value + Mensagem(textoLimpo, ehUsuario = true)
+        
         carregando = true
 
         viewModelScope.launch {
-            val historicoJson = montarHistoricoSaudeJson()
-            val resposta      = chatRepository.enviarMensagem(textoLimpo, imagemBytes, historicoJson)
-            _mensagens.value  = _mensagens.value + Mensagem(resposta, ehUsuario = false)
-            carregando = false
+            try {
+                val historicoJson = montarHistoricoSaudeJson()
+                val resposta = chatRepository.enviarMensagem(textoLimpo, imagemBytes, historicoJson)
+                _mensagens.value = _mensagens.value + Mensagem(resposta, ehUsuario = false)
+            } catch (e: Exception) {
+                Log.e("MegumiViewModel", "Erro ao enviar mensagem: ${e.message}")
+            } finally {
+                carregando = false
+            }
         }
     }
 

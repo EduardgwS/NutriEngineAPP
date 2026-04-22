@@ -27,6 +27,9 @@ class PesquisarViewModel(application: Application) : AndroidViewModel(applicatio
     private val _resultados = MutableStateFlow<List<Alimento>>(emptyList())
     val resultados: StateFlow<List<Alimento>> = _resultados.asStateFlow()
 
+    private val _recentes = MutableStateFlow<List<Alimento>>(emptyList())
+    val recentes: StateFlow<List<Alimento>> = _recentes.asStateFlow()
+
     var query         by mutableStateOf("") ; private set
     var carregando    by mutableStateOf(false) ; private set
     var semResultados by mutableStateOf(false) ; private set
@@ -74,26 +77,29 @@ class PesquisarViewModel(application: Application) : AndroidViewModel(applicatio
      */
     fun salvarLista(itens: List<AlimentoComQuantidade>) {
         if (itens.isEmpty()) return
-        consumoRepo.salvarListaDeAlimentos(
-            alimentos = itens.map { a ->
-                ConsumoRepository.AlimentoSalvo(
-                    id                  = a.alimento.id,
-                    descricao           = a.alimento.descricao,
-                    categoria           = a.alimento.categoria,
-                    quantidadeG         = a.quantidadeG,
-                    kcalPer100g         = a.alimento.kcal,
-                    proteinasPer100g    = a.alimento.proteinas,
-                    carboidratosPer100g = a.alimento.carboidratos,
-                    gordurasPer100g     = a.alimento.gorduras,
-                )
-            }
-        )
+        viewModelScope.launch {
+            consumoRepo.salvarListaDeAlimentos(
+                alimentos = itens.map { a ->
+                    ConsumoRepository.AlimentoSalvo(
+                        id                  = a.alimento.id,
+                        descricao           = a.alimento.descricao,
+                        categoria           = a.alimento.categoria,
+                        quantidadeG         = a.quantidadeG,
+                        kcalPer100g         = a.alimento.kcal,
+                        proteinasPer100g    = a.alimento.proteinas,
+                        carboidratosPer100g = a.alimento.carboidratos,
+                        gordurasPer100g     = a.alimento.gorduras,
+                    )
+                }
+            )
+        }
     }
 
     // ── Identificação por imagem ──────────────────────────────────────────────
 
     var identificando        by mutableStateOf(false)           ; private set
     var alimentoIdentificado by mutableStateOf<Alimento?>(null) ; private set
+    var gramasIdentificados  by mutableStateOf<Double?>(null)   ; private set
     var erroIdentificacao    by mutableStateOf<String?>(null)   ; private set
 
     fun identificarPorImagem(imagemBytes: ByteArray) {
@@ -101,20 +107,22 @@ class PesquisarViewModel(application: Application) : AndroidViewModel(applicatio
             identificando        = true
             erroIdentificacao    = null
             alimentoIdentificado = null
+            gramasIdentificados  = null
 
-            val nomeIdentificado = repo.identificarPorImagem(imagemBytes)
+            val identificacao = repo.identificarPorImagem(imagemBytes)
 
-            if (nomeIdentificado.isNullOrBlank()) {
+            if (identificacao == null || identificacao.nome.isBlank()) {
                 erroIdentificacao = "Não consegui identificar o alimento na foto. Tente outra imagem ou use a busca manual."
                 identificando     = false
                 return@launch
             }
 
-            val resultado = repo.pesquisar(nomeIdentificado).firstOrNull()
+            val resultado = repo.pesquisar(identificacao.nome).firstOrNull()
             if (resultado == null) {
-                erroIdentificacao = "Alimento \"$nomeIdentificado\" identificado, mas não encontrado na tabela TACO. Tente buscar manualmente."
+                erroIdentificacao = "Alimento \"${identificacao.nome}\" identificado, mas não encontrado na tabela TACO. Tente buscar manualmente."
             } else {
                 alimentoIdentificado = resultado
+                gramasIdentificados  = identificacao.gramas
             }
             identificando = false
         }
@@ -122,6 +130,7 @@ class PesquisarViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun limparIdentificacao() {
         alimentoIdentificado = null
+        gramasIdentificados  = null
         erroIdentificacao    = null
     }
 
@@ -162,5 +171,28 @@ class PesquisarViewModel(application: Application) : AndroidViewModel(applicatio
         query             = ""
         _resultados.value = emptyList()
         semResultados     = false
+    }
+
+    fun carregarRecentes() {
+        viewModelScope.launch {
+            val historico = consumoRepo.lerHistoricoCompleto7Dias()
+            val alimentosUnicos = historico
+                .flatMap { it.listas }
+                .flatMap { it.alimentos }
+                .distinctBy { it.id }
+                .map { a ->
+                    Alimento(
+                        id           = a.id,
+                        descricao    = a.descricao,
+                        categoria    = a.categoria,
+                        kcal         = a.kcalPer100g,
+                        proteinas    = a.proteinasPer100g,
+                        carboidratos = a.carboidratosPer100g,
+                        gorduras     = a.gordurasPer100g
+                    )
+                }
+                .take(20)
+            _recentes.value = alimentosUnicos
+        }
     }
 }

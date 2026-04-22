@@ -2,6 +2,7 @@ package com.explosionlab.nutriengine.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -14,6 +15,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.explosionlab.nutriengine.NetworkModule
 import com.explosionlab.nutriengine.R
 import com.explosionlab.nutriengine.ui.theme.NutriGreen
 
@@ -31,15 +34,10 @@ fun TopBar(
 ) {
     var menuAberto by remember { mutableStateOf(false) }
 
-
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val versionName = remember {
-        context.packageManager.getPackageInfo(context.packageName, 0).versionName
-
-    }
+    val servidorDisponivel by NetworkModule.servidorDisponivel.collectAsStateWithLifecycle()
 
     Surface(
-        color          = NutriGreen,
+        color          = if (servidorDisponivel) NutriGreen else Color(0xFF424242),
         tonalElevation = 4.dp
     ) {
         Row(
@@ -52,24 +50,40 @@ fun TopBar(
         ) {
 
             Icon(
-                painter = painterResource(id = R.mipmap.ic_launcher_foreground),
+                painter = painterResource(id = R.drawable.logo),
                 contentDescription = "Ícone do Aplicativo",
                 modifier = Modifier
-                    .size(30.dp)
-                    .scale(2.2f),
-                tint = Color.White
+                    .size(35.dp)
             )
 
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(8.dp))
             Column(verticalArrangement = Arrangement.Center) {
                 Text(
-
-                    text       = "NutriEngine\nVersão $versionName",
+                    text       = "NutriEngine",
                     color      = Color.White,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize   = 16.sp,
-                    lineHeight = 16.sp
+                    fontWeight = FontWeight.Black,
+                    fontSize   = 18.sp
                 )
+                if (!servidorDisponivel) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CloudOff,
+                            contentDescription = null,
+                            tint = Color(0xFFFFD54F),
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Text(
+                            text       = "SEM CONEXÃO COM O SERVIDOR",
+                            color      = Color(0xFFFFD54F),
+                            fontWeight = FontWeight.Bold,
+                            fontSize   = 10.sp,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+                }
             }
 
             Spacer(Modifier.weight(1f))

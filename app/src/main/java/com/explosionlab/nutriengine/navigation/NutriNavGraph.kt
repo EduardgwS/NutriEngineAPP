@@ -2,8 +2,8 @@ package com.explosionlab.nutriengine.navigation
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
-import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.navigation.compose.NavHost
@@ -13,13 +13,15 @@ import com.explosionlab.nutriengine.screens.*
 import com.explosionlab.nutriengine.viewmodel.AppViewModel
 import com.explosionlab.nutriengine.viewmodel.HomeViewModel
 import com.explosionlab.nutriengine.viewmodel.MegumiViewModel
+import com.explosionlab.nutriengine.viewmodel.MercadoViewModel
 
 
 @Composable
 fun NutriNavGraph(
-    appViewModel:    AppViewModel,
-    homeViewModel:   HomeViewModel,
-    megumiViewModel: MegumiViewModel,
+    appViewModel:     AppViewModel,
+    homeViewModel:    HomeViewModel,
+    megumiViewModel:  MegumiViewModel,
+    mercadoViewModel: MercadoViewModel,
 ) {
     val navController = rememberNavController()
 
@@ -33,14 +35,12 @@ fun NutriNavGraph(
     val mostrarNav = rotaAtual in rotasComNav
     val tabAtual   = NutriTab.entries.find { it.rota == rotaAtual } ?: NutriTab.INICIO
 
-
-
     val itensMenu = remember {
         listOf(
             MenuItemData(
-                label = "Editar Perfil",
-                icone = Icons.Default.Person,
-                acao  = { navController.navigate("editar_perfil") },
+                label = "Configurações",
+                icone = Icons.Default.Settings,
+                acao  = { navController.navigate("configuracoes") },
             ),
             MenuItemData(
                 label = "Sair",
@@ -109,7 +109,6 @@ fun NutriNavGraph(
                 )
             }
 
-            // ── Edição de perfil (acessível pelo menu) ─────────────────────────
             composable("editar_perfil") {
                 ConhecerPerfilScreen(
                     isEdicao    = true,
@@ -118,8 +117,20 @@ fun NutriNavGraph(
                 )
             }
 
+            composable("configuracoes") {
+                ConfiguracoesScreen(
+                    onVoltar          = { navController.popBackStack() },
+                    onEditarPerfil    = { navController.navigate("editar_perfil") },
+                    appViewModel = appViewModel,
+                )
+            }
+
             composable(NutriTab.INICIO.rota) {
-                HomeScreen(innerPadding = innerPadding, viewModel = homeViewModel)
+                HomeScreen(
+                    innerPadding     = innerPadding,
+                    viewModel        = homeViewModel,
+                    mercadoViewModel = mercadoViewModel,
+                )
             }
 
             composable(NutriTab.PESQUISAR.rota) {

@@ -28,8 +28,15 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.BakeryDining
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.KebabDining
+import androidx.compose.material.icons.filled.KebabDining
+import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.*
@@ -83,10 +90,14 @@ fun PesquisarScreen(
     val listaSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var listaAberta     by remember { mutableStateOf(false) }
 
+    var recentesAberto  by remember { mutableStateOf(false) }
+    val recentes        by viewModel.recentes.collectAsState()
+
     val listaEscolhidos      by viewModel.listaEscolhidos.collectAsState()
 
     val identificando        = viewModel.identificando
     val alimentoIdentificado = viewModel.alimentoIdentificado
+    val gramasIdentificados  = viewModel.gramasIdentificados
     val erroIdentificacao    = viewModel.erroIdentificacao
 
     val resultadoSheetState  = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -329,8 +340,6 @@ fun PesquisarScreen(
                 ResumoLista(
                     itens    = resumoSnapshot,
                     onFechar = {
-                        viewModel.salvarLista(resumoSnapshot)
-                        viewModel.limparLista()
                         listaAberta   = false
                         resumoVisivel = false
                     }
@@ -342,10 +351,79 @@ fun PesquisarScreen(
                     onLimpar      = { viewModel.limparLista() },
                     onFechar      = { listaAberta = false },
                     onFecharLista = {
+                        // 1. Captura o estado atual para exibição no resumo
                         resumoSnapshot = listaEscolhidos.toList()
-                        resumoVisivel  = true
+                        // 2. Salva no banco e limpa a lista de rascunho imediatamente
+                        viewModel.salvarLista(listaEscolhidos)
+                        viewModel.limparLista()
+                        // 3. Mostra o resumo apenas como informação
+                        resumoVisivel = true
+                    },
+                    onRecentes = {
+                        viewModel.carregarRecentes()
+                        recentesAberto = true
                     }
                 )
+            }
+        }
+    }
+
+    if (recentesAberto) {
+        ModalBottomSheet(
+            onDismissRequest = { recentesAberto = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .navigationBarsPadding()
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Alimentos Recentes",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    IconButton(onClick = { recentesAberto = false }) {
+                        Icon(Icons.Default.Close, contentDescription = "Fechar")
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                if (recentes.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().height(160.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "Nenhum alimento recente encontrado",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(bottom = 16.dp)
+                    ) {
+                        items(recentes) { alimento ->
+                            CardAlimento(
+                                alimento = alimento,
+                                onClick = {
+                                    alimentoSelecionado = alimento
+                                    recentesAberto = false
+                                    sheetAberto = true
+                                }
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -359,6 +437,7 @@ fun PesquisarScreen(
             if (alimentoIdentificado != null) {
                 DetalheAlimento(
                     alimento = alimentoIdentificado,
+                    initialGramas = gramasIdentificados ?: 100.0,
                     onVoltar = { viewModel.limparIdentificacao() },
                     onFechar = { viewModel.limparIdentificacao() },
                     onAdicionarNaLista = { alimento, gramas ->
@@ -417,6 +496,7 @@ fun ListaEscolhidos(
     onLimpar:      () -> Unit,
     onFechar:      () -> Unit,
     onFecharLista: () -> Unit,
+    onRecentes:    () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -466,9 +546,28 @@ fun ListaEscolhidos(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium
                     )
+                    Spacer(Modifier.height(16.dp))
+                    OutlinedButton(
+                        onClick = onRecentes,
+                        shape   = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.History, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Ver Alimentos Recentes")
+                    }
                 }
             }
         } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(onClick = onRecentes) {
+                    Icon(Icons.Default.History, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Adicionar Recentes")
+                }
+            }
             LazyColumn(
                 modifier            = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -553,7 +652,7 @@ fun ResumoLista(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text  = "⚡ Total de calorias",
+                    text  = "Total de calorias",
                     style = MaterialTheme.typography.labelLarge,
                     color = Color.White.copy(alpha = 0.85f)
                 )
@@ -574,9 +673,9 @@ fun ResumoLista(
             modifier              = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            MacroCard("🥩 Proteínas",    "%.1f g".format(totalProt),  Modifier.weight(1f))
-            MacroCard("🍞 Carboidratos", "%.1f g".format(totalCarbo), Modifier.weight(1f))
-            MacroCard("🧈 Gorduras",     "%.1f g".format(totalGord),  Modifier.weight(1f))
+            MacroCard("Proteínas",    "%.1f g".format(totalProt),  Modifier.weight(1f), icon = Icons.Default.KebabDining)
+            MacroCard("Carboidratos", "%.1f g".format(totalCarbo), Modifier.weight(1f), icon = Icons.Default.BakeryDining)
+            MacroCard("Gorduras",     "%.1f g".format(totalGord),  Modifier.weight(1f), icon = Icons.Default.WaterDrop)
         }
 
         Spacer(Modifier.height(24.dp))
@@ -587,7 +686,7 @@ fun ResumoLista(
             shape    = RoundedCornerShape(28.dp),
             colors   = ButtonDefaults.buttonColors(containerColor = NutriGreen)
         ) {
-            Text("Concluir e limpar lista", color = Color.White, fontWeight = FontWeight.Bold)
+            Text("Entendido", color = Color.White, fontWeight = FontWeight.Bold)
         }
 
         Spacer(Modifier.height(8.dp))
@@ -762,13 +861,16 @@ fun CardAlimento(alimento: Alimento, onClick: () -> Unit) {
 @Composable
 fun DetalheAlimento(
     alimento:           Alimento,
+    initialGramas:      Double = 100.0,
     onVoltar:           () -> Unit,
     onFechar:           () -> Unit,
     onAdicionarNaLista: (Alimento, Double) -> Unit = { _, _ -> },
 ) {
-    // Estado do campo de gramas — começa em 100
-    var gramasInput by remember { mutableStateOf("100") }
-    val gramas = gramasInput.replace(",", ".").toDoubleOrNull()?.coerceAtLeast(0.1) ?: 100.0
+    // Estado do campo de gramas — começa com o valor inicial (100 ou o identificado)
+    var gramasInput by remember(alimento, initialGramas) {
+        mutableStateOf(if (initialGramas % 1 == 0.0) initialGramas.toInt().toString() else initialGramas.toString())
+    }
+    val gramas = gramasInput.replace(",", ".").toDoubleOrNull()?.coerceAtLeast(0.1) ?: initialGramas
     val fator  = gramas / 100.0
 
     // Valores escalonados para o preview
@@ -843,13 +945,13 @@ fun DetalheAlimento(
         Spacer(Modifier.height(8.dp))
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            DadoCard("⚡ Energia",  "%.0f kcal".format(kcalReal),  Modifier.weight(1f))
-            DadoCard("🥩 Proteína", "%.1f g".format(protReal),     Modifier.weight(1f))
+            DadoCard("Energia",  "%.0f kcal".format(kcalReal),  Modifier.weight(1f), icon = Icons.Default.Bolt)
+            DadoCard("Proteína", "%.1f g".format(protReal),     Modifier.weight(1f), icon = Icons.Default.KebabDining)
         }
         Spacer(Modifier.height(8.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            DadoCard("🍞 Carbo",   "%.1f g".format(carboReal),    Modifier.weight(1f))
-            DadoCard("🧈 Gordura", "%.1f g".format(gordReal),     Modifier.weight(1f))
+            DadoCard("Carbo",   "%.1f g".format(carboReal),    Modifier.weight(1f), icon = Icons.Default.BakeryDining)
+            DadoCard("Gordura", "%.1f g".format(gordReal),     Modifier.weight(1f), icon = Icons.Default.WaterDrop)
         }
 
         // Referência por 100g (em texto pequeno, sempre visível)
@@ -884,7 +986,12 @@ fun DetalheAlimento(
 // ── Macro card reutilizável ───────────────────────────────────────────────────
 
 @Composable
-fun MacroCard(label: String, valor: String, modifier: Modifier = Modifier) {
+fun MacroCard(
+    label:    String,
+    valor:    String,
+    modifier: Modifier    = Modifier,
+    icon:     ImageVector? = null
+) {
     Card(
         modifier = modifier,
         shape    = RoundedCornerShape(14.dp),
@@ -898,6 +1005,15 @@ fun MacroCard(label: String, valor: String, modifier: Modifier = Modifier) {
                 .padding(vertical = 14.dp, horizontal = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            if (icon != null) {
+                Icon(
+                    imageVector        = icon,
+                    contentDescription = null,
+                    tint               = NutriGreen,
+                    modifier           = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.height(4.dp))
+            }
             Text(
                 text      = label,
                 style     = MaterialTheme.typography.labelSmall,

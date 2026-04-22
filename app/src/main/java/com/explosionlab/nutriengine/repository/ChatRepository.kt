@@ -17,7 +17,7 @@ class ChatRepository(private val authRepository: AuthRepository) {
     private val httpClient = NetworkModule.httpClient
     private val backendUrl = AuthRepository.BACKEND_URL
 
-    // ── Enviar mensagem ────────────────────────────────────────────────────────
+    // ── Enviar mensagem ───────────────────────────────────────────────────────
 
     suspend fun enviarMensagem(
         texto:              String,
@@ -56,6 +56,8 @@ class ChatRepository(private val authRepository: AuthRepository) {
                     response.isSuccessful -> JSONObject(body).optString("response", "Sem resposta.")
                     response.code == 400  -> "Digite uma mensagem antes de enviar."
                     response.code == 401  -> "Sessão expirada. Faça login novamente."
+                    response.code == 530  -> "Desculpe, não consegui me conectar com o servidor."
+
                     else                  -> "Erro ${response.code}: tente novamente."
                 }
             }

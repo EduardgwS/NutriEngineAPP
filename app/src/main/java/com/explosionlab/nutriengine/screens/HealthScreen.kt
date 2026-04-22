@@ -7,13 +7,19 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.BakeryDining
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.KebabDining
+import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -136,10 +142,10 @@ fun HealthScreen(
             SecaoTitulo("Macronutrientes hoje")
 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                DadoCard("Carbo",  "%.1fg".format(state.nutricao.carboidratos), Modifier.weight(1f))
-                DadoCard("Prot.",  "%.1fg".format(state.nutricao.proteinas),    Modifier.weight(1f))
-                DadoCard("Gord.",  "%.1fg".format(state.nutricao.gorduras),     Modifier.weight(1f))
-                DadoCard("⚡ Kcal",   "%.0f".format(state.nutricao.calorias),   Modifier.weight(1f))
+                DadoCard("Carbo",  "%.1fg".format(state.nutricao.carboidratos), Modifier.weight(1f), icon = Icons.Default.BakeryDining)
+                DadoCard("Prot.",  "%.1fg".format(state.nutricao.proteinas),    Modifier.weight(1f), icon = Icons.Default.KebabDining)
+                DadoCard("Gord.",  "%.1fg".format(state.nutricao.gorduras),     Modifier.weight(1f), icon = Icons.Default.WaterDrop)
+                DadoCard("Kcal",    "%.0f".format(state.nutricao.calorias),   Modifier.weight(1f), icon = Icons.Default.Bolt)
             }
 
             // ── Vitaminas do dia ───────────────────────────────────────────────
@@ -328,7 +334,12 @@ fun FormularioNutricao(
 }
 
 @Composable
-fun DadoCard(label: String, valor: String, modifier: Modifier = Modifier) {
+fun DadoCard(
+    label: String,
+    valor: String,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null
+) {
     Card(
         modifier = modifier,
         colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
@@ -337,10 +348,33 @@ fun DadoCard(label: String, valor: String, modifier: Modifier = Modifier) {
             modifier            = Modifier.padding(10.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(label, style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                if (icon != null) {
+                    Icon(
+                        imageVector        = icon,
+                        contentDescription = null,
+                        tint               = NutriGreen,
+                        modifier           = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                }
+                Text(
+                    text      = label,
+                    style     = MaterialTheme.typography.bodySmall,
+                    color     = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+            }
             Spacer(Modifier.height(4.dp))
-            Text(valor, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(
+                text       = valor,
+                style      = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                textAlign  = TextAlign.Center
+            )
         }
     }
 }

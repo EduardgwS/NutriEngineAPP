@@ -21,6 +21,11 @@ data class Alimento(
     val gorduras:     Double,
 )
 
+data class IdentificacaoResult(
+    val nome:   String,
+    val gramas: Double? = null,
+)
+
 class AlimentoRepository(private val authRepository: AuthRepository) {
 
     private val TAG        = "AlimentoRepository"
@@ -70,10 +75,10 @@ class AlimentoRepository(private val authRepository: AuthRepository) {
 
     /**
      * Envia uma imagem para o endpoint /api/identificar-alimento e retorna
-     * o nome normalizado do alimento identificado pela IA, ou null se não
-     * encontrado / erro.
+     * o nome normalizado do alimento identificado pela IA e os gramas estimados,
+     * ou null se não encontrado / erro.
      */
-    suspend fun identificarPorImagem(imagemBytes: ByteArray): String? = withContext(Dispatchers.IO) {
+    suspend fun identificarPorImagem(imagemBytes: ByteArray): IdentificacaoResult? = withContext(Dispatchers.IO) {
         try {
             val token = authRepository.carregarToken() ?: return@withContext null
 
@@ -97,7 +102,13 @@ class AlimentoRepository(private val authRepository: AuthRepository) {
                 val body = response.body?.string() ?: return@withContext null
                 val json = JSONObject(body)
                 if (json.getString("status") != "success") return@withContext null
-                json.optString("alimento").takeIf { it.isNotBlank() && it != "null" }
+
+                val nome = json.optString("alimento").takeIf { it.isNotBlank() && it != "null" }
+                    ?: return@withContext null
+
+                val gramas = if (json.has("gramas")) json.getDouble("gramas") else null
+
+                IdentificacaoResult(nome, gramas)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao identificar alimento por imagem: ${e.message}")

@@ -54,21 +54,32 @@ class PerfilViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             state = state.copy(isCarregando = true)
 
+            // 1. Carrega o que já está salvo no repositório local
+            val perfilSalvo = perfilRepo.carregarPerfil(nomeGoogleFallback = authRepo.carregarNome())
+
+            state = state.copy(
+                nomeInput      = perfilSalvo.nome,
+                dataNascimento = perfilSalvo.dataNascimento,
+                sexo           = perfilSalvo.sexo,
+                objetivo       = perfilSalvo.objetivo,
+                nivelAtividade = perfilSalvo.nivelAtividade,
+                pesoInput      = if (perfilSalvo.peso > 0) "%.1f".format(perfilSalvo.peso) else "",
+                alturaInput    = if (perfilSalvo.altura > 0) "%.2f".format(perfilSalvo.altura) else ""
+            )
+
+            // 2. Tenta complementar com dados do Health Connect se disponível
             if (healthRepo.isDisponivel()) {
 
                 delay(600L)
 
                 if (healthRepo.temPermissoes()) {
-                    val peso   = healthRepo.lerUltimoPeso()
-                    val altura = healthRepo.lerUltimaAltura()
-
-                    val pesoPre   = peso?.let   { "%.1f".format(it) } ?: ""
-                    val alturaPre = altura?.let { "%.2f".format(it) } ?: ""
+                    val pesoHC   = healthRepo.lerUltimoPeso()
+                    val alturaHC = healthRepo.lerUltimaAltura()
 
                     state = state.copy(
-                        pesoInput        = pesoPre,
-                        alturaInput      = alturaPre,
-                        preenchidoPeloHC = pesoPre.isNotEmpty() || alturaPre.isNotEmpty(),
+                        pesoInput        = pesoHC?.let { "%.1f".format(it) } ?: state.pesoInput,
+                        alturaInput      = alturaHC?.let { "%.2f".format(it) } ?: state.alturaInput,
+                        preenchidoPeloHC = pesoHC != null || alturaHC != null,
                     )
                 }
             }

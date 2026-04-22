@@ -181,7 +181,7 @@ private fun PerfilFormulario(
                 color = LightGreenContainer,
             ) {
                 Text(
-                    "✅ Dados importados do Health Connect. Confirme ou ajuste se necessário.",
+                    "Dados importados do Health Connect. Confirme ou ajuste se necessário.",
                     style    = MaterialTheme.typography.bodySmall,
                     color    = SuccessGreen,
                     modifier = Modifier.padding(12.dp),

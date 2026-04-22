@@ -1,10 +1,12 @@
 package com.explosionlab.nutriengine.screens
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -13,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -175,12 +178,75 @@ fun BolhaMensagem(msg: Mensagem) {
                 .background(corFundo, formato)
                 .padding(horizontal = 14.dp, vertical = 10.dp),
         ) {
-            Text(
-                text  = parseMarkdown(msg.texto),
-                color = corTexto,
-                style = MaterialTheme.typography.bodyMedium,
-            )
+            if (msg.texto == "...") {
+                TypingIndicator(color = corTexto)
+            } else {
+                Text(
+                    text  = parseMarkdown(msg.texto),
+                    color = corTexto,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
         }
+    }
+}
+
+@Composable
+fun TypingIndicator(color: Color) {
+    val transition = rememberInfiniteTransition(label = "typing")
+    val dotAlpha1 by transition.animateFloat(
+        initialValue = 0.2f,
+        targetValue  = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = keyframes {
+                durationMillis = 600
+                0.2f at 0
+                1f   at 200
+                1f   at 400
+                0.2f at 600
+            },
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "dot1"
+    )
+    val dotAlpha2 by transition.animateFloat(
+        initialValue = 0.2f,
+        targetValue  = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = keyframes {
+                durationMillis = 600
+                0.2f at 100
+                1f   at 300
+                1f   at 500
+                0.2f at 600
+            },
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "dot2"
+    )
+    val dotAlpha3 by transition.animateFloat(
+        initialValue = 0.2f,
+        targetValue  = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = keyframes {
+                durationMillis = 600
+                0.2f at 200
+                1f   at 400
+                1f   at 600
+            },
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "dot3"
+    )
+
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment     = Alignment.CenterVertically,
+        modifier              = Modifier.padding(vertical = 4.dp)
+    ) {
+        Box(Modifier.size(6.dp).alpha(dotAlpha1).background(color, CircleShape))
+        Box(Modifier.size(6.dp).alpha(dotAlpha2).background(color, CircleShape))
+        Box(Modifier.size(6.dp).alpha(dotAlpha3).background(color, CircleShape))
     }
 }
 
