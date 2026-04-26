@@ -23,14 +23,13 @@ import com.explosionlab.nutriengine.core.designsystem.LightGreenContainer
 import com.explosionlab.nutriengine.core.designsystem.NutriGreen
 
 @Composable
-fun HealthConnectIntroScreen(
+fun HealthConnectOnboardingScreen(
     onContinuar: () -> Unit,
-    viewModel:   HealthConnectIntroViewModel = viewModel()
+    viewModel:   HealthConnectOnboardingViewModel = viewModel()
 ) {
     val permissaoLauncher = rememberLauncherForActivityResult(
         contract = PermissionController.createRequestPermissionResultContract()
     ) {
-
         onContinuar()
     }
 
@@ -42,7 +41,6 @@ fun HealthConnectIntroScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(Modifier.height(56.dp))
-
 
         Box(
             modifier         = Modifier
@@ -77,7 +75,6 @@ fun HealthConnectIntroScreen(
         )
 
         Spacer(Modifier.height(32.dp))
-
 
         BeneficioItem(
             titulo    = "Peso e altura automáticos",

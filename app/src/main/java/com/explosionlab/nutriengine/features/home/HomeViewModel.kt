@@ -6,7 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.explosionlab.nutriengine.core.data.repository.AuthRepository
 import com.explosionlab.nutriengine.core.data.repository.ConsumoRepository
-import com.explosionlab.nutriengine.features.health.HealthRepository
+import com.explosionlab.nutriengine.features.health.HealthConnectRepository
 import com.explosionlab.nutriengine.core.di.NetworkModule
 import com.explosionlab.nutriengine.core.model.DicaMacro
 import com.explosionlab.nutriengine.core.model.Objetivo
@@ -52,7 +52,7 @@ data class MacroState(
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private val authRepository = AuthRepository(application)
-    private val healthRepo     = HealthRepository(application)
+    private val healthRepo     = HealthConnectRepository(application)
     private val perfilRepo     = PerfilRepository(application)
     private val consumoRepo    = ConsumoRepository(application)
 

@@ -8,18 +8,19 @@ import androidx.health.connect.client.records.*
 import androidx.health.connect.client.records.metadata.Metadata
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
-import androidx.health.connect.client.units.Energy
 import androidx.health.connect.client.units.Length
 import androidx.health.connect.client.units.Mass
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
 
-class HealthRepository(private val context: Context) {
+class HealthConnectRepository(private val context: Context) {
 
-    private val TAG = "HealthRepository"
-
+    companion object {
+        private const val TAG = "HealthConnectRepository"
+    }
 
     val permissions = setOf(
         HealthPermission.getReadPermission(WeightRecord::class),
@@ -46,18 +47,19 @@ class HealthRepository(private val context: Context) {
 
     // ── Helpers de intervalo ───────────────────────────────────────────────────
 
-    private fun rangeDia(data: LocalDate): TimeRangeFilter = TimeRangeFilter.between(
-        data.atStartOfDay().toInstant(ZoneOffset.UTC),
-        data.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC)
-    )
+    private fun rangeDia(data: LocalDate): TimeRangeFilter {
+        val zone = ZoneId.systemDefault()
+        return TimeRangeFilter.between(
+            data.atStartOfDay(zone).toInstant(),
+            data.plusDays(1).atStartOfDay(zone).toInstant()
+        )
+    }
 
     private fun ultimoAno(): TimeRangeFilter = TimeRangeFilter.between(
         Instant.now().minus(365, ChronoUnit.DAYS), Instant.now()
     )
 
-    private fun hoje(): TimeRangeFilter = rangeDia(LocalDate.now())
-
-    // ── Dados Nutricionais ─────────────────────────────────────────────────────
+    // ── Modelos ────────────────────────────────────────────────────────────────
 
     data class NutricaoDiaria(
         val carboidratos: Double = 0.0,   // g
@@ -74,11 +76,6 @@ class HealthRepository(private val context: Context) {
         val potassio:     Double = 0.0,   // mg
     )
 
-    data class DiaNutricional(
-        val data:     LocalDate,
-        val nutricao: NutricaoDiaria,
-    )
-
     // ── Leitura — Corpo ────────────────────────────────────────────────────────
 
     suspend fun lerUltimoPeso(): Double? = try {
@@ -90,11 +87,6 @@ class HealthRepository(private val context: Context) {
         client().readRecords(ReadRecordsRequest(HeightRecord::class, ultimoAno()))
             .records.lastOrNull()?.height?.inMeters
     } catch (e: Exception) { Log.e(TAG, "Altura: ${e.message}"); null }
-
-    suspend fun lerCaloriasAtivasHoje(): Double = try {
-        client().readRecords(ReadRecordsRequest(ActiveCaloriesBurnedRecord::class, hoje()))
-            .records.sumOf { it.energy.inKilocalories }
-    } catch (e: Exception) { Log.e(TAG, "Calorias ativas: ${e.message}"); 0.0 }
 
     // ── Leitura — Nutrição ─────────────────────────────────────────────────────
 
@@ -126,15 +118,6 @@ class HealthRepository(private val context: Context) {
     /** Atalho para o dia atual. Delega para [lerNutricaoDia]. */
     suspend fun lerNutricaoHoje(): NutricaoDiaria = lerNutricaoDia(LocalDate.now())
 
-    /** Retorna os totais nutricionais dos últimos 7 dias (do mais antigo ao mais recente). */
-    suspend fun lerHistorico7Dias(): List<DiaNutricional> {
-        val hoje = LocalDate.now()
-        return (6 downTo 0).map { diasAtras ->
-            val data = hoje.minusDays(diasAtras.toLong())
-            DiaNutricional(data = data, nutricao = lerNutricaoDia(data))
-        }
-    }
-
     // ── Escrita — Corpo ────────────────────────────────────────────────────────
 
     suspend fun salvarPeso(kg: Double): Boolean = try {
@@ -163,44 +146,4 @@ class HealthRepository(private val context: Context) {
 
     // ── Escrita — Nutrição ─────────────────────────────────────────────────────
 
-    data class EntradaNutricao(
-        val carboidratos: Double? = null,
-        val proteinas:    Double? = null,
-        val gorduras:     Double? = null,
-        val calorias:     Double? = null,
-        val vitaminaC:    Double? = null,
-        val vitaminaD:    Double? = null,
-        val vitaminaA:    Double? = null,
-        val vitaminaB12:  Double? = null,
-        val calcio:       Double? = null,
-        val ferro:        Double? = null,
-        val sodio:        Double? = null,
-        val potassio:     Double? = null,
-    )
-
-    suspend fun salvarNutricao(entrada: EntradaNutricao): Boolean = try {
-        val agora = Instant.now()
-        client().insertRecords(listOf(
-            NutritionRecord(
-                startTime           = agora.minusSeconds(1),
-                endTime             = agora,
-                startZoneOffset     = ZoneOffset.UTC,
-                endZoneOffset       = ZoneOffset.UTC,
-                metadata            = Metadata.manualEntry(),
-                totalCarbohydrate   = entrada.carboidratos?.let { Mass.grams(it) },
-                protein             = entrada.proteinas?.let    { Mass.grams(it) },
-                totalFat            = entrada.gorduras?.let     { Mass.grams(it) },
-                energy              = entrada.calorias?.let     { Energy.kilocalories(it) },
-                vitaminC            = entrada.vitaminaC?.let    { Mass.milligrams(it) },
-                vitaminD            = entrada.vitaminaD?.let    { Mass.micrograms(it) },
-                vitaminA            = entrada.vitaminaA?.let    { Mass.micrograms(it) },
-                vitaminB12          = entrada.vitaminaB12?.let  { Mass.micrograms(it) },
-                calcium             = entrada.calcio?.let       { Mass.milligrams(it) },
-                iron                = entrada.ferro?.let        { Mass.milligrams(it) },
-                sodium              = entrada.sodio?.let        { Mass.milligrams(it) },
-                potassium           = entrada.potassio?.let     { Mass.milligrams(it) },
-            )
-        ))
-        true
-    } catch (e: Exception) { Log.e(TAG, "Salvar nutrição: ${e.message}"); false }
 }

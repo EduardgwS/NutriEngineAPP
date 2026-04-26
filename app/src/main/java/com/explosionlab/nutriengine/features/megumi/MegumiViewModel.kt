@@ -13,7 +13,7 @@ import androidx.lifecycle.viewModelScope
 import com.explosionlab.nutriengine.core.model.Mensagem
 import com.explosionlab.nutriengine.core.data.repository.AuthRepository
 import com.explosionlab.nutriengine.core.data.repository.ConsumoRepository
-import com.explosionlab.nutriengine.features.health.HealthRepository
+import com.explosionlab.nutriengine.features.health.HealthConnectRepository
 import com.explosionlab.nutriengine.core.data.repository.PerfilRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,7 +27,7 @@ class MegumiViewModel(application: Application) : AndroidViewModel(application) 
 
     private val authRepository = AuthRepository(application)
     private val chatRepository = ChatRepository(authRepository)
-    private val healthRepo     = HealthRepository(application)
+    private val healthRepo     = HealthConnectRepository(application)
     private val perfilRepo     = PerfilRepository(application)
     private val consumoRepo    = ConsumoRepository(application)
 

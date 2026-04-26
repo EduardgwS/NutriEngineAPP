@@ -11,7 +11,7 @@ import com.explosionlab.nutriengine.core.data.repository.PerfilRepository
 import com.explosionlab.nutriengine.core.model.NivelAtividade
 import com.explosionlab.nutriengine.core.model.Objetivo
 import com.explosionlab.nutriengine.core.model.Sexo
-import com.explosionlab.nutriengine.features.health.HealthRepository
+import com.explosionlab.nutriengine.features.health.HealthConnectRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -36,7 +36,7 @@ class PerfilViewModel(application: Application) : AndroidViewModel(application) 
 
     private val perfilRepo = PerfilRepository(application)
     private val authRepo   = AuthRepository(application)
-    private val healthRepo = HealthRepository(application)
+    private val healthRepo = HealthConnectRepository(application)
 
     var state by mutableStateOf(run {
         val nomeGoogle       = authRepo.carregarNome()

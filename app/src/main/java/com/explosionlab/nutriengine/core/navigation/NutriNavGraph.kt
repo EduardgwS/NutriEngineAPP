@@ -15,7 +15,7 @@ import com.explosionlab.nutriengine.core.designsystem.components.BottomBar
 import com.explosionlab.nutriengine.core.designsystem.components.MenuItemData
 import com.explosionlab.nutriengine.core.designsystem.components.NutriTab
 import com.explosionlab.nutriengine.core.designsystem.components.TopBar
-import com.explosionlab.nutriengine.features.health.HealthConnectIntroScreen
+import com.explosionlab.nutriengine.features.health.HealthConnectOnboardingScreen
 import com.explosionlab.nutriengine.features.home.HomeScreen
 import com.explosionlab.nutriengine.features.home.HomeViewModel
 import com.explosionlab.nutriengine.features.login.LoginScreen
@@ -103,7 +103,7 @@ fun NutriNavGraph(
             }
 
             composable("hc_intro") {
-                HealthConnectIntroScreen(
+                HealthConnectOnboardingScreen(
                     onContinuar = {
                         navController.navigate("perfil") {
                             popUpTo("hc_intro") { inclusive = true }

@@ -5,7 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.explosionlab.nutriengine.core.data.repository.AuthRepository
 import com.explosionlab.nutriengine.core.data.repository.ConsumoRepository
-import com.explosionlab.nutriengine.features.health.HealthRepository
+import com.explosionlab.nutriengine.features.health.HealthConnectRepository
 import com.explosionlab.nutriengine.core.model.Perfil
 import com.explosionlab.nutriengine.core.data.repository.PerfilRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,7 +25,7 @@ class RelatorioViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val authRepo    = AuthRepository(application)
     private val perfilRepo  = PerfilRepository(application)
-    private val healthRepo  = HealthRepository(application)
+    private val healthRepo  = HealthConnectRepository(application)
     private val consumoRepo = ConsumoRepository(application)
 
     private val _state = MutableStateFlow(RelatorioUiState())

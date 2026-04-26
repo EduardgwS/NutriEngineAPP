@@ -12,7 +12,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.explosionlab.nutriengine.core.notifications.NotificationScheduler
-import com.explosionlab.nutriengine.features.health.HealthRepository
+import com.explosionlab.nutriengine.features.health.HealthConnectRepository
 import kotlinx.coroutines.launch
 
 data class ConfiguracoesUiState(
@@ -21,7 +21,7 @@ data class ConfiguracoesUiState(
 
 class ConfiguracoesViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val healthRepo = HealthRepository(application)
+    private val healthRepo = HealthConnectRepository(application)
     private val prefs      = application.getSharedPreferences("nutriengine_prefs", Context.MODE_PRIVATE)
 
     var state by mutableStateOf(ConfiguracoesUiState()); private set
