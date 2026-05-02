@@ -6,6 +6,7 @@ import com.explosionlab.nutriengine.core.data.local.AppDatabase
 import com.explosionlab.nutriengine.core.data.local.entity.AlimentoEntity
 import com.explosionlab.nutriengine.core.data.local.entity.ConsumoDiarioEntity
 import com.explosionlab.nutriengine.core.data.local.entity.ListaEntity
+import com.explosionlab.nutriengine.features.health.HealthConnectRepository
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -14,7 +15,7 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 
-class ConsumoRepository(context: Context) {
+class ConsumoRepository(private val context: Context) {
 
     companion object {
         private const val TAG = "ConsumoRepository"
@@ -22,6 +23,7 @@ class ConsumoRepository(context: Context) {
 
     private val db  = AppDatabase.getDatabase(context)
     private val dao = db.consumoDao()
+    private val healthRepo = HealthConnectRepository(context)
 
     private val _mudancas = MutableSharedFlow<Unit>(replay = 1)
     val mudancas: SharedFlow<Unit> = _mudancas.asSharedFlow()
@@ -156,13 +158,38 @@ class ConsumoRepository(context: Context) {
 
     private suspend fun recalcularTotais(data: String) {
         val listas = carregarListas(data)
+        val kcal = listas.sumOf { it.totalKcal }
+        val prot = listas.sumOf { it.totalProteinas }
+        val carbo = listas.sumOf { it.totalCarboidratos }
+        val gord = listas.sumOf { it.totalGorduras }
+
         salvarConsumoLocal(
             data      = data,
-            kcal      = listas.sumOf { it.totalKcal },
-            proteinaG = listas.sumOf { it.totalProteinas },
-            carboG    = listas.sumOf { it.totalCarboidratos },
-            gorduraG  = listas.sumOf { it.totalGorduras },
+            kcal      = kcal,
+            proteinaG = prot,
+            carboG    = carbo,
+            gorduraG  = gord,
         )
+
+        // Sincronizar com Health Connect
+        try {
+            if (healthRepo.isDisponivel() && healthRepo.temPermissoes()) {
+                val localDate = LocalDate.parse(data)
+                healthRepo.sincronizarNutricaoDia(
+                    data = localDate,
+                    nutricao = HealthConnectRepository.NutricaoDiaria(
+                        calorias = kcal,
+                        carboidratos = carbo,
+                        proteinas = prot,
+                        gorduras = gord
+                    )
+                )
+                Log.d(TAG, "Sincronizado com Health Connect para o dia $data")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao sincronizar com Health Connect: ${e.message}")
+        }
+
         _mudancas.emit(Unit)
     }
 

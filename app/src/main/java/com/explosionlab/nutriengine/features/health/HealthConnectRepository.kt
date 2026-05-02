@@ -10,10 +10,12 @@ import androidx.health.connect.client.records.WeightRecord
 import androidx.health.connect.client.records.metadata.Metadata
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
+import androidx.health.connect.client.units.Energy
 import androidx.health.connect.client.units.Length
 import androidx.health.connect.client.units.Mass
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
@@ -35,13 +37,20 @@ class HealthConnectRepository(private val context: Context) {
 
     // ── Disponibilidade ────────────────────────────────────────────────────────
 
-    fun isDisponivel(): Boolean =
-        HealthConnectClient.getSdkStatus(context) == HealthConnectClient.SDK_AVAILABLE
+    fun isDisponivel(): Boolean {
+        val status = HealthConnectClient.getSdkStatus(context)
+        Log.d(TAG, "Status do SDK: $status")
+        return status == HealthConnectClient.SDK_AVAILABLE
+    }
 
     private fun client(): HealthConnectClient = HealthConnectClient.getOrCreate(context)
 
     suspend fun temPermissoes(): Boolean = try {
-        client().permissionController.getGrantedPermissions().containsAll(permissions)
+        val granted = client().permissionController.getGrantedPermissions()
+        val hasAll = granted.containsAll(permissions)
+        Log.d(TAG, "Permissões concedidas: $granted")
+        Log.d(TAG, "Tem todas as permissões necessárias? $hasAll")
+        hasAll
     } catch (e: Exception) {
         Log.e(TAG, "Erro ao verificar permissões: ${e.message}"); false
     }
@@ -147,4 +156,81 @@ class HealthConnectRepository(private val context: Context) {
 
     // ── Escrita — Nutrição ─────────────────────────────────────────────────────
 
+    /** Salva macronutrientes e micronutrientes no Health Connect para uma data específica. */
+    suspend fun salvarNutricao(
+        nutricao: NutricaoDiaria,
+        data: LocalDate = LocalDate.now()
+    ): Boolean = try {
+        val zoneId = ZoneId.systemDefault()
+        // Define um intervalo pequeno de 1 minuto para o registro, para evitar que o Health Connect
+        // ignore o registro por ter startTime == endTime (alguns dispositivos/versões preferem um intervalo real)
+        val startTime = data.atTime(LocalTime.now()).atZone(zoneId).toInstant()
+        val endTime = startTime.plusSeconds(60)
+        val zoneOffset = zoneId.rules.getOffset(startTime)
+
+        val record = NutritionRecord(
+            startTime = startTime,
+            startZoneOffset = zoneOffset,
+            endTime = endTime,
+            endZoneOffset = zoneOffset,
+            energy = Energy.kilocalories(nutricao.calorias),
+            totalCarbohydrate = Mass.grams(nutricao.carboidratos),
+            protein = Mass.grams(nutricao.proteinas),
+            totalFat = Mass.grams(nutricao.gorduras),
+            vitaminC = if (nutricao.vitaminaC > 0) Mass.milligrams(nutricao.vitaminaC) else null,
+            vitaminD = if (nutricao.vitaminaD > 0) Mass.micrograms(nutricao.vitaminaD) else null,
+            vitaminA = if (nutricao.vitaminaA > 0) Mass.micrograms(nutricao.vitaminaA) else null,
+            vitaminB12 = if (nutricao.vitaminaB12 > 0) Mass.micrograms(nutricao.vitaminaB12) else null,
+            calcium = if (nutricao.calcio > 0) Mass.milligrams(nutricao.calcio) else null,
+            iron = if (nutricao.ferro > 0) Mass.milligrams(nutricao.ferro) else null,
+            sodium = if (nutricao.sodio > 0) Mass.milligrams(nutricao.sodio) else null,
+            potassium = if (nutricao.potassio > 0) Mass.milligrams(nutricao.potassio) else null,
+            metadata = Metadata.manualEntry()
+        )
+
+        Log.d(TAG, "Tentando inserir NutritionRecord: ${nutricao.calorias} kcal em $startTime")
+        val response = client().insertRecords(listOf(record))
+        Log.d(TAG, "Inserção concluída. IDs: ${response.recordIdsList}")
+        true
+    } catch (e: Exception) {
+        Log.e(TAG, "Erro ao salvar nutrição: ${e.message}"); false
+    }
+
+    /** Exclui todos os registros de nutrição inseridos por este app em um dia específico. */
+    suspend fun limparNutricaoPorData(data: LocalDate): Boolean = try {
+        client().deleteRecords(
+            recordType = NutritionRecord::class,
+            timeRangeFilter = rangeDia(data)
+        )
+        true
+    } catch (e: Exception) {
+        Log.e(TAG, "Erro ao limpar nutrição do dia $data: ${e.message}"); false
+    }
+
+    /** Atalho para sincronizar: Limpa o dia e salva o novo total. */
+    suspend fun sincronizarNutricaoDia(data: LocalDate, nutricao: NutricaoDiaria): Boolean {
+        limparNutricaoPorData(data)
+        return salvarNutricao(nutricao, data)
+    }
+
+    /** Exclui registros de nutrição pelos IDs fornecidos. */
+    suspend fun excluirNutricaoPorIds(ids: List<String>): Boolean = try {
+        client().deleteRecords(
+            recordType = NutritionRecord::class,
+            recordIdsList = ids,
+            clientRecordIdsList = emptyList()
+        )
+        true
+    } catch (e: Exception) {
+        Log.e(TAG, "Erro ao excluir registros de nutrição: ${e.message}"); false
+    }
+
+    /** Retorna a lista detalhada de registros de nutrição do dia para obter os IDs. */
+    suspend fun lerRegistrosNutricaoDia(data: LocalDate): List<NutritionRecord> = try {
+        client()
+            .readRecords(ReadRecordsRequest(NutritionRecord::class, rangeDia(data)))
+            .records
+    } catch (e: Exception) {
+        Log.e(TAG, "Erro ao ler registros de nutrição: ${e.message}"); emptyList()
+    }
 }

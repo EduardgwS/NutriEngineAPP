@@ -26,10 +26,10 @@ class AuthRepository(private val context: Context) {
     private val httpClient = NetworkModule.httpClient
 
     companion object {
-        private const val TAG        = "AuthRepository"
+        private const val TAG = "AuthRepository"
         private const val PREFS_NAME = "nutriengine_prefs"
-        private const val KEY_JWT    = "jwt_token"
-        private const val KEY_NAME   = "user_name"
+        private const val KEY_JWT = "jwt_token"
+        private const val KEY_NAME = "user_name"
     }
 
     //Tokens
@@ -81,10 +81,9 @@ class AuthRepository(private val context: Context) {
             val idToken = GoogleIdTokenCredential.createFrom(credential.data).idToken
             enviarTokenAoBackend(idToken)
 
-        }
-        catch (e: NoCredentialException) {
+        } catch (e: NoCredentialException) {
             Log.e(TAG, "Usuário sem conta: ${e.message}")
-            ResultadoLogin(false, mensagem = "Nenhuma conta Google encontrada no dispositivo.")
+            ResultadoLogin(false, mensagem = "Erro ao localizar conta, tente novamente.")
 
         } catch (e: Exception) {
             Log.e(TAG, "Erro inesperado: ${e.message}")

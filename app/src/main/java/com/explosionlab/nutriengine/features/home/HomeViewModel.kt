@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import kotlin.math.abs
 
 //Consumo dos macronutrientes do dia
 data class MacroState(
@@ -80,20 +81,41 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     nomeGoogleFallback = authRepository.carregarNome()
                 )
 
+                Log.d("HomeViewModel", "Iniciando carga de calorias para $hoje")
 
-                var kcalHoje  = 0.0
-                var protHoje  = 0.0
-                var carboHoje = 0.0
-                var gordHoje  = 0.0
+                // 1. Carregar dados locais (Fonte da Verdade para o app)
+                val local = consumoRepo.carregarConsumoLocal(hoje.toString())
+                var kcalHoje  = local.kcal
+                var protHoje  = local.proteinaG
+                var carboHoje = local.carboG
+                var gordHoje  = local.gorduraG
 
+                // 2. Verificar Health Connect
                 if (healthRepo.isDisponivel() && healthRepo.temPermissoes()) {
                     val hc = healthRepo.lerNutricaoDia(hoje)
-                    if (hc.calorias > 0) {
+                    Log.d("HomeViewModel", "Dados HC: ${hc.calorias} kcal | Dados Local: ${local.kcal} kcal")
+
+                    // Se local tem dados e HC está diferente, sincronizamos para o HC (Escrita/Update/Delete)
+                    if (local.kcal > 0 && abs(hc.calorias - local.kcal) > 1.0) {
+                        Log.d("HomeViewModel", "Sincronizando Local -> Health Connect")
+                        healthRepo.sincronizarNutricaoDia(
+                            data = hoje,
+                            nutricao = HealthConnectRepository.NutricaoDiaria(
+                                calorias = local.kcal,
+                                carboidratos = local.carboG,
+                                proteinas = local.proteinaG,
+                                gorduras = local.gorduraG
+                            )
+                        )
+                    }
+                    // Se local está vazio mas HC tem dados, importamos para o app (migração ou outro app)
+                    else if (local.kcal <= 0 && hc.calorias > 0) {
+                        Log.d("HomeViewModel", "Importando Health Connect -> Local")
                         kcalHoje  = hc.calorias
                         protHoje  = hc.proteinas
                         carboHoje = hc.carboidratos
                         gordHoje  = hc.gorduras
-                        consumoRepo.acumularConsumoLocal(
+                        consumoRepo.salvarConsumoLocal(
                             data      = hoje.toString(),
                             kcal      = hc.calorias,
                             proteinaG = hc.proteinas,
@@ -101,14 +123,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                             gorduraG  = hc.gorduras,
                         )
                     }
-                }
-
-                if (kcalHoje <= 0) {
-                    val local = consumoRepo.carregarConsumoLocal(hoje.toString())
-                    kcalHoje  = local.kcal
-                    protHoje  = local.proteinaG
-                    carboHoje = local.carboG
-                    gordHoje  = local.gorduraG
+                } else {
+                    Log.d("HomeViewModel", "Health Connect não disponível ou sem permissões.")
                 }
 
                 //Meta dos Macronutrientes
