@@ -1,3 +1,5 @@
+@file:Suppress("AssignedValueIsNeverRead")
+
 package com.explosionlab.nutriengine.features.home
 
 import android.Manifest
@@ -35,6 +37,7 @@ import com.explosionlab.nutriengine.core.model.RecomendacaoReceita
 import com.explosionlab.nutriengine.core.notifications.NotificationScheduler
 import com.explosionlab.nutriengine.features.home.components.CaloriasProgressBar
 import com.explosionlab.nutriengine.features.home.components.ControleCard
+import com.explosionlab.nutriengine.features.home.components.MegumiInsightCard
 import com.explosionlab.nutriengine.features.home.components.MetaDoDiaCard
 import com.explosionlab.nutriengine.features.home.components.ProdutoDetalheSheet
 import com.explosionlab.nutriengine.features.home.components.ReceitaDetalheSheet
@@ -75,15 +78,20 @@ fun HomeScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        if (state.streak > 0 || state.semanaStatus.any { it }) {
-            ControleCard(streak = state.streak, semanaStatus = state.semanaStatus)
-        }
+
+        ControleCard(streak = state.streak, semanaStatus = state.semanaStatus)
+
 
         CaloriasProgressBar(state.caloriasHoje, state.caloriasRecomendadas)
 
         if (state.macroState.proteinaMeta > 0) {
             MetaDoDiaCard(state.macroState, state.dicaMacro)
         }
+
+        MegumiInsightCard(
+            insight = state.insightMegumi,
+            carregando = state.carregandoInsight
+        )
 
         state.recomendacaoReceita?.let { receita ->
             ReceitaRecomendadaCard(receita, onClick = { receitaDetalhe = receita })
@@ -140,9 +148,9 @@ private fun RequestNotificationPermission(context: Context) {
     ) { isGranted ->
         if (isGranted) {
             context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                .edit()
-                .putBoolean(PREF_NOTIF_ATIVAS, true)
-                .apply()
+                .edit {
+                    putBoolean(PREF_NOTIF_ATIVAS, true)
+                }
             NotificationScheduler.ativar(context)
         }
     }

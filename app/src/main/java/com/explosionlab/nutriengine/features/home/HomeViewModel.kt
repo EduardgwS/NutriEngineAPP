@@ -12,6 +12,8 @@ import com.explosionlab.nutriengine.core.model.DicaMacro
 import com.explosionlab.nutriengine.core.model.Objetivo
 import com.explosionlab.nutriengine.core.model.RecomendacaoReceita
 import com.explosionlab.nutriengine.features.health.HealthConnectRepository
+import com.explosionlab.nutriengine.core.data.repository.HealthContextRepository
+import com.explosionlab.nutriengine.features.megumi.ChatRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,6 +30,8 @@ data class HomeUiState(
     val dicaMacro: DicaMacro? = null,
     val streak: Int = 0,
     val semanaStatus: List<Boolean> = emptyList(),
+    val insightMegumi: String? = null,
+    val carregandoInsight: Boolean = false,
 )
 
 data class MacroState(
@@ -72,6 +76,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val healthRepo = HealthConnectRepository(application)
     private val perfilRepo = PerfilRepository(application)
     private val consumoRepo = ConsumoRepository(application)
+    private val chatRepo = ChatRepository(authRepo)
+    private val healthContextRepo = HealthContextRepository(application)
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -103,6 +109,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
             launch { carregarStreak(hoje, perfil.caloriasRecomendadas) }
             launch { buscarRecomendacoes(perfil.objetivo, macroState) }
+            launch { solicitarInsightInterno() }
 
         } catch (e: Exception) {
             Log.e("HomeViewModel", "Erro ao carregar dados", e)
@@ -183,6 +190,20 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
         } catch (e: Exception) {
             Log.e("HomeViewModel", "Erro na API de recomendações", e)
+        }
+    }
+
+    private suspend fun solicitarInsightInterno() {
+        if (_uiState.value.carregandoInsight) return
+
+        _uiState.update { it.copy(carregandoInsight = true) }
+        try {
+            val historicoJson = healthContextRepo.montarHistoricoSaudeJson()
+            val resposta = chatRepo.pedirInsight(historicoJson)
+            _uiState.update { it.copy(insightMegumi = resposta, carregandoInsight = false) }
+        } catch (e: Exception) {
+            Log.e("HomeViewModel", "Erro ao solicitar insight", e)
+            _uiState.update { it.copy(carregandoInsight = false) }
         }
     }
 }

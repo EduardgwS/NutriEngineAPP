@@ -3,14 +3,11 @@ package com.explosionlab.nutriengine.features.market
 import android.util.Log
 import com.explosionlab.nutriengine.core.data.repository.AuthRepository
 import com.explosionlab.nutriengine.core.di.NetworkModule
+import com.explosionlab.nutriengine.core.network.ParceiroDto
+import com.explosionlab.nutriengine.core.network.RecomendacaoProdutoDto
+import com.explosionlab.nutriengine.core.network.RecomendacoesRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONArray
-import org.json.JSONObject
-
 
 data class Parceiro(
     val id:      String,
@@ -38,12 +35,9 @@ data class RecomendacaoProduto(
     val gorduras:     Double,
 )
 
-
-
 class MercadoRepository(private val authRepository: AuthRepository) {
 
-    private val httpClient = NetworkModule.httpClient
-    private val backendUrl = NetworkModule.BACKEND_URL
+    private val api = NetworkModule.api
 
     companion object {
         private const val TAG = "MercadoRepository"
@@ -56,83 +50,50 @@ class MercadoRepository(private val authRepository: AuthRepository) {
     ): List<RecomendacaoProduto> = withContext(Dispatchers.IO) {
         val token = authRepository.carregarToken() ?: return@withContext emptyList()
         try {
-            val payload = JSONObject().apply {
-                put("necessidades", JSONArray(necessidades))
-            }.toString()
-
-            val request = Request.Builder()
-                .url("$backendUrl/mercado/recomendacoes")
-                .addHeader("Authorization", "Bearer $token")
-                .post(payload.toRequestBody("application/json".toMediaType()))
-                .build()
-
-            httpClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@withContext emptyList()
-                val body  = response.body.string()
-                val array = JSONObject(body).optJSONArray("recomendacoes") ?: JSONArray(body)
-                parseRecomendacoes(array)
-            }
+            val response = api.getRecomendacoes(RecomendacoesRequest(necessidades), "Bearer $token")
+            response.recomendacoes.map { it.toRecomendacao() }
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao buscar recomendações: ${e.message}")
             emptyList()
         }
     }
 
-    private fun parseRecomendacoes(array: JSONArray): List<RecomendacaoProduto> =
-        (0 until array.length()).mapNotNull { i ->
-            runCatching {
-                val obj = array.getJSONObject(i)
-                RecomendacaoProduto(
-                    produtoId   = obj.getString("id"),
-                    nome        = obj.getString("nome"),
-                    marca       = obj.optString("marca", ""),
-                    imagemUrl   = obj.optString("imagem_url", ""),
-                    nomeMercado = obj.optString("nome_mercado", ""),
-                    logoMercado = obj.optString("logo_mercado", ""),
-                    precoAtual  = obj.getDouble("preco_atual"),
-                    precoAntigo = obj.optDouble("preco_antigo", -1.0).takeIf { it > 0 },
-                    quantidadeG = obj.optDouble("quantidade_g", 100.0),
-                    motivo      = obj.optString("motivo", ""),
-                    urlCompra   = obj.getString("url_compra"),
-                    categoria   = obj.optString("categoria", ""),
-                    kcal         = obj.optDouble("kcal",         0.0),
-                    proteinas    = obj.optDouble("proteinas",    0.0),
-                    carboidratos = obj.optDouble("carboidratos", 0.0),
-                    gorduras     = obj.optDouble("gorduras",     0.0),
-                )
-            }.getOrNull()
-        }
+    private fun RecomendacaoProdutoDto.toRecomendacao() = RecomendacaoProduto(
+        produtoId   = id,
+        nome        = nome,
+        marca       = marca ?: "",
+        imagemUrl   = imagemUrl ?: "",
+        nomeMercado = nomeMercado ?: "",
+        logoMercado = logoMercado ?: "",
+        precoAtual  = precoAtual,
+        precoAntigo = precoAntigo.takeIf { it != null && it > 0 },
+        quantidadeG = quantidadeG ?: 100.0,
+        motivo      = motivo ?: "",
+        urlCompra   = urlCompra,
+        categoria   = categoria ?: "",
+        kcal         = kcal ?: 0.0,
+        proteinas    = proteinas ?: 0.0,
+        carboidratos = carboidratos ?: 0.0,
+        gorduras     = gorduras ?: 0.0,
+    )
 
     //Parceiros
 
     suspend fun listarParceiros(): List<Parceiro> = withContext(Dispatchers.IO) {
         val token = authRepository.carregarToken() ?: return@withContext emptyList()
         try {
-            val request = Request.Builder()
-                .url("$backendUrl/mercado/parceiros")
-                .addHeader("Authorization", "Bearer $token")
-                .get()
-                .build()
-
-            httpClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@withContext emptyList()
-                val body  = response.body.string()
-                val array = JSONObject(body).optJSONArray("parceiros") ?: JSONArray(body)
-                (0 until array.length()).mapNotNull { i ->
-                    runCatching {
-                        val obj = array.getJSONObject(i)
-                        Parceiro(
-                            id      = obj.getString("id"),
-                            nome    = obj.getString("nome"),
-                            logoUrl = obj.optString("logo_url", ""),
-                            siteUrl = obj.optString("site_url", ""),
-                        )
-                    }.getOrNull()
-                }
-            }
+            val response = api.getParceiros("Bearer $token")
+            response.parceiros.map { it.toParceiro() }
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao listar parceiros: ${e.message}")
             emptyList()
         }
     }
+
+    private fun ParceiroDto.toParceiro() = Parceiro(
+        id      = id,
+        nome    = nome,
+        logoUrl = logoUrl ?: "",
+        siteUrl = siteUrl ?: "",
+    )
 }

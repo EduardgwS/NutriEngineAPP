@@ -4,68 +4,79 @@ import android.util.Log
 import com.explosionlab.nutriengine.core.data.repository.AuthRepository
 import com.explosionlab.nutriengine.core.di.NetworkModule
 import com.explosionlab.nutriengine.core.model.Mensagem
+import com.explosionlab.nutriengine.core.network.ChatRequest
+import com.explosionlab.nutriengine.core.network.InsightRequest
+import com.google.gson.Gson
+import com.google.gson.JsonObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.MultipartBody
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
+import retrofit2.HttpException
 
 class ChatRepository(private val authRepository: AuthRepository) {
 
     companion object{
-        private const val TAG        = "ChatRepository"
+        private const val TAG = "ChatRepository"
     }
-    private val httpClient = NetworkModule.httpClient
-    private val backendUrl = NetworkModule.BACKEND_URL
+    private val api = NetworkModule.api
 
     //Envio de mensagens
 
     suspend fun enviarMensagem(
         texto:              String,
-        imagemBytes:        ByteArray? = null,
-        historicoSaudeJson: String?    = null,
+        historicoSaudeJson: String? = null,
     ): String = withContext(Dispatchers.IO) {
         val token = authRepository.carregarToken()
             ?: return@withContext "Sessão expirada. Faça login novamente."
 
         try {
-            val multipart = MultipartBody.Builder()
-                .setType(MultipartBody.FORM)
-                .addFormDataPart("text", texto)
-                .apply {
-                    imagemBytes?.let {
-                        addFormDataPart(
-                            "image", "foto.jpg",
-                            it.toRequestBody("image/jpeg".toMediaTypeOrNull(), 0, it.size)
-                        )
-                    }
-                    historicoSaudeJson?.let {
-                        addFormDataPart("historico_saude", it)
-                    }
-                }
-                .build()
+            val historicoObj = historicoSaudeJson?.let {
+                Gson().fromJson(it, JsonObject::class.java)
+            }
 
-            val request = Request.Builder()
-                .url("$backendUrl/megumi/chat")
-                .addHeader("Authorization", "Bearer $token")
-                .post(multipart)
-                .build()
+            val request = ChatRequest(
+                text = texto,
+                userName = authRepository.carregarNome(),
+                historicoSaude = historicoObj
+            )
 
-            httpClient.newCall(request).execute().use { response ->
-                val body = response.body.string()
-                when {
-                    response.isSuccessful -> JSONObject(body).optString("response", "Sem resposta.")
-                    response.code == 400  -> "Digite uma mensagem antes de enviar."
-                    response.code == 401  -> "Sessão expirada. Faça login novamente."
-                    response.code == 530  -> "Desculpe, não consegui me conectar com o servidor."
+            val response = api.enviarMensagemChat(request, "Bearer $token")
+            response.response
 
-                    else                  -> "Erro ${response.code}: tente novamente."
-                }
+        } catch (e: HttpException) {
+            when (e.code()) {
+                400  -> "Digite uma mensagem antes de enviar."
+                401  -> "Sessão expirada. Faça login novamente."
+                530  -> "Desculpe, não consegui me conectar com o servidor."
+                else -> "Erro ${e.code()}: tente novamente."
             }
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao enviar mensagem: ${e.message}")
+            "Erro de conexão: ${e.message}"
+        }
+    }
+
+    suspend fun pedirInsight(
+        historicoSaudeJson: String?
+    ): String = withContext(Dispatchers.IO) {
+        val token = authRepository.carregarToken()
+            ?: return@withContext "Sessão expirada. Faça login novamente."
+
+        try {
+            val historicoObj = historicoSaudeJson?.let {
+                Gson().fromJson(it, JsonObject::class.java)
+            }
+
+            val response = api.pedirInsight(InsightRequest(historicoObj), "Bearer $token")
+            response.insight
+
+        } catch (e: HttpException) {
+            when (e.code()) {
+                401  -> "Sessão expirada. Faça login novamente."
+                530  -> "Desculpe, não consegui me conectar com o servidor."
+                else -> "Erro ${e.code()}: tente novamente."
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao pedir insight: ${e.message}")
             "Erro de conexão: ${e.message}"
         }
     }
@@ -77,30 +88,12 @@ class ChatRepository(private val authRepository: AuthRepository) {
                 ?: return@withContext emptyList()
 
             try {
-                val request = Request.Builder()
-                    .url("$backendUrl/megumi/historico?limite=$limite")
-                    .addHeader("Authorization", "Bearer $token")
-                    .get()
-                    .build()
-
-                httpClient.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) return@withContext emptyList()
-
-                    val body  = response.body.string()
-                    val json  = JSONObject(body)
-                    val array = json.optJSONArray("mensagens") ?: return@withContext emptyList()
-
-                    val lista = mutableListOf<Mensagem>()
-                    for (i in 0 until array.length()) {
-                        val item = array.getJSONObject(i)
-                        lista.add(
-                            Mensagem(
-                                texto     = item.getString("mensagem"),
-                                ehUsuario = item.getString("papel") == "user"
-                            )
-                        )
-                    }
-                    lista
+                val response = api.getHistoricoChat(limite, "Bearer $token")
+                response.mensagens.map {
+                    Mensagem(
+                        texto = it.mensagem,
+                        ehUsuario = it.papel == "user"
+                    )
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Erro ao carregar histórico: ${e.message}")

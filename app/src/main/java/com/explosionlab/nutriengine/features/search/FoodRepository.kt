@@ -5,58 +5,28 @@ import com.explosionlab.nutriengine.core.data.repository.AuthRepository
 import com.explosionlab.nutriengine.core.di.NetworkModule
 import com.explosionlab.nutriengine.core.model.Alimento
 import com.explosionlab.nutriengine.core.model.IdentificacaoResult
+import com.explosionlab.nutriengine.core.network.AlimentoDto
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
-import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONArray
-import org.json.JSONObject
 
 class FoodRepository(private val authRepository: AuthRepository) {
 
     companion object {
-        private const val TAG = "MercadoRepository"
+        private const val TAG = "FoodRepository"
     }
-    private val httpClient = NetworkModule.httpClient
-    private val backendUrl = NetworkModule.BACKEND_URL
+    private val api = NetworkModule.api
 
     suspend fun pesquisar(query: String): List<Alimento> = withContext(Dispatchers.IO) {
         if (query.isBlank()) return@withContext emptyList()
 
         try {
-            val url     = "$backendUrl/api/search?q=${query.trim().lowercase()}"
-            val token   = authRepository.carregarToken() ?: return@withContext emptyList()
-            val request = Request.Builder()
-                .url(url)
-                .addHeader("Authorization", "Bearer $token")
-                .get()
-                .build()
-
-            httpClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@withContext emptyList()
-                val body  = response.body.string()
-                val array = JSONArray(body)
-                val lista = mutableListOf<Alimento>()
-
-                for (i in 0 until array.length()) {
-                    val item   = array.getJSONObject(i)
-                    val macros = item.getJSONObject("macros")
-                    lista.add(
-                        Alimento(
-                            id           = item.getString("id"),
-                            descricao    = item.getString("description"),
-                            categoria    = item.optString("category", ""),
-                            kcal         = macros.optDouble("kcal",    0.0),
-                            proteinas    = macros.optDouble("protein", 0.0),
-                            carboidratos = macros.optDouble("carbs",   0.0),
-                            gorduras     = macros.optDouble("fat",     0.0),
-                        )
-                    )
-                }
-                lista
-            }
+            val token = authRepository.carregarToken() ?: return@withContext emptyList()
+            val response = api.pesquisarAlimento(query.trim().lowercase(), "Bearer $token")
+            
+            response.map { it.toAlimento() }
         } catch (e: Exception) {
             Log.e(TAG, "Erro na pesquisa: ${e.message}")
             emptyList()
@@ -68,37 +38,33 @@ class FoodRepository(private val authRepository: AuthRepository) {
         try {
             val token = authRepository.carregarToken() ?: return@withContext null
 
-            val requestBody = MultipartBody.Builder()
-                .setType(MultipartBody.FORM)
-                .addFormDataPart(
-                    name     = "image",
-                    filename = "foto.jpg",
-                    body     = imagemBytes.toRequestBody("image/jpeg".toMediaType())
-                )
-                .build()
+            val part = MultipartBody.Part.createFormData(
+                name     = "image",
+                filename = "foto.jpg",
+                body     = imagemBytes.toRequestBody("image/jpeg".toMediaType())
+            )
 
-            val request = Request.Builder()
-                .url("$backendUrl/api/identificar-alimento")
-                .addHeader("Authorization", "Bearer $token")
-                .post(requestBody)
-                .build()
+            val response = api.identificarAlimento(part, "Bearer $token")
+            
+            if (response.status != "success") return@withContext null
 
-            httpClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@withContext null
-                val body = response.body.string()
-                val json = JSONObject(body)
-                if (json.getString("status") != "success") return@withContext null
+            val nome = response.alimento?.takeIf { it.isNotBlank() && it != "null" }
+                ?: return@withContext null
 
-                val nome = json.optString("alimento").takeIf { it.isNotBlank() && it != "null" }
-                    ?: return@withContext null
-
-                val gramas = if (json.has("gramas")) json.getDouble("gramas") else null
-
-                IdentificacaoResult(nome, gramas)
-            }
+            IdentificacaoResult(nome, response.gramas)
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao identificar alimento por imagem: ${e.message}")
             null
         }
     }
+
+    private fun AlimentoDto.toAlimento() = Alimento(
+        id           = id,
+        descricao    = description,
+        categoria    = category ?: "",
+        kcal         = macros.kcal,
+        proteinas    = macros.protein,
+        carboidratos = macros.carbs,
+        gorduras     = macros.fat
+    )
 }

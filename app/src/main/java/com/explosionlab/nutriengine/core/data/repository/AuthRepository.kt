@@ -11,19 +11,16 @@ import androidx.credentials.exceptions.NoCredentialException
 import com.explosionlab.nutriengine.R
 import com.explosionlab.nutriengine.core.di.NetworkModule
 import com.explosionlab.nutriengine.core.model.ResultadoLogin
+import com.explosionlab.nutriengine.core.network.LoginRequest
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
 
 class AuthRepository(private val context: Context) {
 
     private val webClientId = context.getString(R.string.web_client_id)
-    private val httpClient = NetworkModule.httpClient
+    private val api = NetworkModule.api
 
     companion object {
         private const val TAG = "AuthRepository"
@@ -94,27 +91,10 @@ class AuthRepository(private val context: Context) {
     private suspend fun enviarTokenAoBackend(idToken: String): ResultadoLogin =
         withContext(Dispatchers.IO) {
             try {
-                val body = JSONObject().apply { put("id_token", idToken) }
-                    .toString().toRequestBody("application/json".toMediaType())
-
-                val request = Request.Builder()
-                    .url("${NetworkModule.BACKEND_URL}/auth/google/android")
-                    .post(body)
-                    .build()
-
-                httpClient.newCall(request).execute().use { response ->
-                    val respBody = response.body.string()
-                    if (response.isSuccessful) {
-                        val json = JSONObject(respBody)
-                        val jwt = json.getString("token")
-                        val name = json.optString("name", "Usuário")
-                        salvarToken(jwt, name)
-                        ResultadoLogin(sucesso = true, nome = name)
-                    } else {
-                        val msg = JSONObject(respBody).optString("error", "Erro desconhecido")
-                        ResultadoLogin(false, mensagem = msg)
-                    }
-                }
+                val response = api.loginGoogle(LoginRequest(idToken))
+                val name = response.name ?: "Usuário"
+                salvarToken(response.token, name)
+                ResultadoLogin(sucesso = true, nome = name)
             } catch (e: Exception) {
                 Log.e(TAG, "Erro de conexão: ${e.message}")
                 ResultadoLogin(
